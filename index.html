@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Video Test</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding: 24px; }
+    video { max-width: 100%; border: 1px solid #ddd; background:#000; }
+    #status p { margin: 6px 0; }
+    .ok { color: green; }
+    .bad { color: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>Local Video Diagnostic</h1>
+  <p>Make sure <strong>this index.html</strong> and your video file (named <strong>science_student.mp4</strong>) are in the same folder.</p>
+
+  <!-- VIDEO: change filename here if needed -->
+  <video id="testVideo" controls preload="metadata">
+    <source src="science_student_fixed.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+
+  <div id="status"></div>
+
+  <h3>Quick fallback test</h3>
+  <p>If your file fails, click this to test a known-good remote MP4:</p>
+  <button id="useRemote">Load remote sample (Big Buck Bunny)</button>
+
+<script>
+  const status = document.getElementById('status');
+  const v = document.getElementById('testVideo');
+
+  function log(msg, cls='') {
+    status.innerHTML += `<p class="${cls}">${msg}</p>`;
+  }
+
+  async function runChecks() {
+    status.innerHTML = '';
+    // 1) canPlayType
+    const can = v.canPlayType('video/mp4');
+    log(`canPlayType('video/mp4') → "${can || ''}"`, can ? 'ok' : 'bad');
+
+    // 2) HEAD request to see if server returns the file
+    try {
+      const res = await fetch('science_student.mp4', { method: 'HEAD' });
+      log(`HEAD fetch: ${res.status} ${res.statusText}`, res.ok ? 'ok' : 'bad');
+    } catch (err) {
+      log(`HEAD fetch error: ${err.message}`, 'bad');
+    }
+
+    // 3) attach video error listener for detailed code
+    v.addEventListener('error', () => {
+      const e = v.error;
+      if (!e) { log('Video error occurred (no error object)', 'bad'); return; }
+      const map = {
+        1: 'MEDIA_ERR_ABORTED',
+        2: 'MEDIA_ERR_NETWORK',
+        3: 'MEDIA_ERR_DECODE',
+        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+      };
+      log(`Video element error code: ${e.code} → ${map[e.code] || 'unknown'}`, 'bad');
+    }, { once: true });
+
+    // 4) try to load metadata to detect decode issues
+    v.addEventListener('loadedmetadata', () => {
+      log('loadedmetadata OK — browser could read file metadata.', 'ok');
+    }, { once: true });
+
+    // 5) attempt a short play test (muted) to check decoding
+    try {
+      await v.play();
+      v.pause();
+      log('play() succeeded (muted autoplay test).', 'ok');
+    } catch (err) {
+      log(`play() attempt: ${err.message} — not necessarily fatal.`, '');
+    }
+  }
+
+  // run on load
+  runChecks();
+
+  // remote fallback button to test video tag capability
+  document.getElementById('useRemote').addEventListener('click', () => {
+    v.src = 'https://www.w3schools.com/html/mov_bbb.mp4';
+    v.load();
+    v.play().catch(()=>{});
+    runChecks();
+  });
+</script>
+</body>
+</html>
